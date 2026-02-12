@@ -1,0 +1,72 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info
+dist
+build
+eggs
+parts
+var
+sdist
+develop-eggs
+.installed.cfg
+lib
+lib64
+.eggs
+
+# Virtual environments
+venv
+.venv
+ENV
+env
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Docker
+Dockerfile*
+docker-compose*
+.docker
+
+# Environment files (будем передавать через env_file)
+# .env  # Раскомментируйте если не хотите копировать .env в образ
+
+# Logs
+*.log
+logs/
+
+# Database (будет в volume)
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# Documentation
+README.md
+docs/
+
+# Tests
+tests/
+test_*.py
+*_test.py
+.pytest_cache
+.coverage
+htmlcov
+
+# Other
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
