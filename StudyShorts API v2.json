@@ -1,0 +1,890 @@
+{
+  "name": "StudyShorts API 2",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $node['Webhook'].json.body.text }}",
+        "options": {
+          "systemMessage": "Аккуратно отформатируй текст задачи, исправь грамматические ошибки если есть, дай только отформатированный текст."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        -1408,
+        -64
+      ],
+      "id": "e34b1eef-dc6f-4420-9ff3-b1da8161a925",
+      "name": "Format Agent",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d7884214-6f87-4f1b-9e31-5f9b286e2324",
+              "name": "task",
+              "value": "={{ $node['Format Agent'].json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "299ed736-e0ad-46e5-b78f-e81dea7e89e5",
+              "name": "solution",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -832,
+        -64
+      ],
+      "id": "82ca7b82-7a33-4314-bb89-dc85f2bf4aca",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.text }}",
+        "options": {
+          "systemMessage": "Реши эту задачу, НИКОГДА И НИ В КОЕМ СЛУЧАЕ не используй LaTeX - выражения ВСЕГДА пиши в формате Plain text (обычный текст), дай только решение по шагам строго в формате:\n### Шаг 1:\n[решение шага]\n### Шаг 1:\n[решение шага]"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        -1104,
+        -64
+      ],
+      "id": "d312d304-bc7b-49fc-a85a-5abaff99c9a3",
+      "name": "Solver Agent",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -512,
+        -64
+      ],
+      "id": "143eea82-4abf-4c27-97e1-c90a23349cb6",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Дай ТОЛЬКО код без лишних Markdown-кавычек, без обьяснений и комментариев. В самом контенте страницы НИКОГДА не используй Markdown-разметку и НИКОГДА не используй LaTeX по типу \\frac, $..$. Весь текстовый контент страницы пиши в формате обычного текста (Plain Text) ",
+        "options": {
+          "systemMessage": "=Напиши простой одностраничный сайт в белых и светло-серых тонах, где будет в удобном формате Дано (только на первом шаге!) Решение, Ответ (Если это последний шаг) представлен данный ниже шаг решения задачи (без LaTeX). Используй Шрифт Onest Semi Bold (по умолчанию) и более толстое начертание. Можешь менять цвет текста и фон блоков текста для выделения ключевых слов в решении, не используй красный. Контент должен быть центрирован и адаптирован для мобильных устройств.\n\nТекущий шаг (номер {{ $node['Loop Over Items'].json.step }}), который ты должен добавить в HTML:\n{{ $node['Loop Over Items'].json.content }}\n\nВот всё решение для контекста, НИ В КОЕМ СЛУЧАЕ НЕ ДОБАВЛЯЙ РЕШЕНИЕ НИЖЕ В HTML:\n{{ $node['Solver Agent'].json.output }}\n\n## Если НИЖЕ есть код HTML, то твоя задача в его стиле создать код для текущего шага!\n{{ $('Get Current HTML').item.json.data }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        -1568,
+        240
+      ],
+      "id": "52112703-6370-4452-9cb0-35172980a0c2",
+      "name": "HTML Agent",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "url": "http://31.128.47.220:****/get",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1744,
+        240
+      ],
+      "id": "a21995f8-674f-4f0f-b32b-f5cb91efe205",
+      "name": "Get Current HTML"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://31.128.47.220:****/append",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $('HTML Agent').item.json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1088,
+        240
+      ],
+      "id": "72ad6a8f-a39e-4959-ab7e-4ca8017da7dc",
+      "name": "Save HTML"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://31.128.47.220:****/html2png",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "width",
+              "value": "600"
+            },
+            {
+              "name": "height",
+              "value": "960"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/html",
+        "body": "={{ $('HTML Agent').item.json.output }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "screenshot.png"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1264,
+        240
+      ],
+      "id": "c1373eec-3137-487f-97c0-1d2e1f2e7d76",
+      "name": "Html2Png"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Составь сжатую речь (максимум 35 слов) (транскрипцию для последующего синтеза речи) для объяснения текущего шага решения задачи, дай только речь без Markdown и/или дополнительных обьяснений, но с запятыми и другими знаками препинания. НИКОГДА не используй LaTeX символы, по типу \\frac, $..$, НИКОГДА не используй Markdown - всё пиши в формате Plain text! Если в тексте встречаются английские буквы, обозначающие велечины - упортебляй ТОЛЬКО русские названия величин, например, вместо V_1 - первый объем. Также для других констант, например, число пи\n\nВот:\n{{ $node['Loop Over Items'].json.content }}\n\nВот всё решение для контекста:\n{{ $node['Solver Agent'].json.output }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        -928,
+        240
+      ],
+      "id": "e059b0ad-b9c1-408c-838e-7ed63b38ccd5",
+      "name": "TTS Agent",
+      "retryOnFail": true,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine PNG (from Html2Png) + Audio (downloaded by HTTP Request)\n\nconst inputItem = $input.first();\n\n// --- AUDIO: expected from HTTP Request as binary.audio\nconst inBinary = inputItem.binary ?? {};\n\nconst audioBinary =\n\tinBinary.audio ??\n\tinBinary.data ??\n\t(Object.keys(inBinary).length ? inBinary[Object.keys(inBinary)[0]] : undefined);\n\n// --- IMAGE: take from Html2Png output\nconst pngNodeItem = $(\"Html2Png\").item;\nconst pngBinaryAll = pngNodeItem?.binary ?? {};\n\nconst imageBinary =\n\tpngBinaryAll.data ??\n\tpngBinaryAll[\"screenshot.png\"] ??\n\t(Object.keys(pngBinaryAll).length\n\t\t? pngBinaryAll[Object.keys(pngBinaryAll)[0]]\n\t\t: undefined);\n\nif (!audioBinary) {\n\tthrow new Error(\n\t\t'No audio binary found on input. Expected HTTP Request to output binary property \"audio\".',\n\t);\n}\n\nif (!imageBinary) {\n\tthrow new Error(\"No image binary found from Html2Png.\");\n}\n\n// --- META from your loop/agents (use matching item)\nconst loopItem = $(\"Loop Over Items\").item;\n\nconst stepNumber = loopItem?.json?.index ?? $itemIndex;\nconst stepContent = loopItem?.json?.content;\n\nconst htmlOutput = $(\"HTML Agent\").item?.json?.output;\nconst ttsText = $(\"TTS Agent\").item?.json?.output;\n\nreturn [\n\t{\n\t\tjson: {\n\t\t\tstepNumber,\n\t\t\tstepContent,\n\t\t\thtmlOutput,\n\t\t\tttsText,\n\t\t\taudioUrl: inputItem.json?.audio,\n\t\t\ttimestamp: new Date().toISOString(),\n\t\t},\n\t\tbinary: {\n\t\t\timage: imageBinary,\n\t\t\taudio: audioBinary,\n\t\t},\n\t},\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        240
+      ],
+      "id": "b1161bf8-d886-4137-b1d5-1da05ecaff1e",
+      "name": "Get Binaries"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputItem = $input.first().json;\nlet text = inputItem.solution || inputItem.text || inputItem.response || '';\n\nif (!text) {\n  return []; // Нет текста — нет шагов\n}\n\nconst stepRegex = /### Шаг (\\d+):\\s*\\n(.*?)(?=### Шаг \\d+:|$)/gs;\nconst intermediateSteps = [];\nlet match;\n\n// Этап 1: Извлечение всех шагов\nwhile ((match = stepRegex.exec(text)) !== null) {\n  const stepNumber = match[1];\n  const stepContent = match[2].trim();\n  intermediateSteps.push({\n    step: parseInt(stepNumber),\n    content: stepContent\n  });\n}\n\n// Этап 2: Определение общего количества шагов\nconst totalStepsCount = intermediateSteps.length;\n\n// Этап 3: Форматирование результата\nconst steps = intermediateSteps.map(item => {\n  return {\n    json: {\n      total_steps: totalStepsCount,\n      step: item.step,\n      content: item.content\n    }\n  };\n});\n\nreturn steps;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        -64
+      ],
+      "id": "5366809d-ef92-4e58-b7ea-8c4cfbc21dc3",
+      "name": "Split in Steps"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://31.128.47.220:8656/append",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "sk-b1913d1033786485"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        640,
+        240
+      ],
+      "id": "74efa764-d1fb-4988-b60c-94237c188aa3",
+      "name": "Add Video"
+    },
+    {
+      "parameters": {
+        "url": "http://31.128.47.220:****/get",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "sk-b1913d1033786485"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -32,
+        48
+      ],
+      "id": "bd95dbc2-f879-4f10-a9ec-4feebafd7bf9",
+      "name": "Get Combined Video",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        -80
+      ],
+      "id": "fea5334f-0f56-48c1-95ea-a24384fef03b",
+      "name": "Wait 2s",
+      "webhookId": "07f7ccdb-5e7f-4828-ba73-a28d22297127"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "http://31.128.47.220:****/delall",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "sk-b1913d1033786485"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1584,
+        -64
+      ],
+      "id": "fba94bf9-09d9-4a8a-ad45-7fd58e6f1da0",
+      "name": "Del All Videos"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://31.128.47.220:****/reset",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1760,
+        -64
+      ],
+      "id": "da35fecb-5271-43de-96e4-a0ce77cb4673",
+      "name": "Reset HTML"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "studyshorts",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1984,
+        -64
+      ],
+      "id": "98a5d24b-36ac-4e17-9226-4fc56b17e608",
+      "name": "Webhook",
+      "webhookId": "40a36c53-e99c-479b-8bdf-b96441305921"
+    },
+    {
+      "parameters": {
+        "model": "=google/gemini-2.5-flash-lite-preview-09-2025",
+        "options": {}
+      },
+      "type": "n8n-nodes-routerai.lmChatRouterAi",
+      "typeVersion": 1,
+      "position": [
+        -1568,
+        400
+      ],
+      "id": "9cd0b12a-d872-4e89-94cf-4e76e4c4e754",
+      "name": "Gemini Flash Lite / 1",
+      "credentials": {
+        "routerAiApi": {
+          "id": "ZkFguueICnDZ86Pb",
+          "name": "RouterAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "=google/gemini-2.5-flash-lite-preview-09-2025",
+        "options": {}
+      },
+      "type": "n8n-nodes-routerai.lmChatRouterAi",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        96
+      ],
+      "id": "7cc654b0-619e-492a-8134-99eebeada5d2",
+      "name": "Gemini Flash Lite / 2",
+      "credentials": {
+        "routerAiApi": {
+          "id": "ZkFguueICnDZ86Pb",
+          "name": "RouterAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "=google/gemini-2.5-flash-lite-preview-09-2025",
+        "options": {}
+      },
+      "type": "n8n-nodes-routerai.lmChatRouterAi",
+      "typeVersion": 1,
+      "position": [
+        -928,
+        400
+      ],
+      "id": "f230f9d0-5d6a-456c-9ba2-1aaa8efe1f2b",
+      "name": "Gemini Flash Lite / 3",
+      "credentials": {
+        "routerAiApi": {
+          "id": "ZkFguueICnDZ86Pb",
+          "name": "RouterAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "studyshorts-get",
+        "responseMode": "lastNode",
+        "responseData": "firstEntryBinary",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -208,
+        48
+      ],
+      "id": "d7680aed-0fc8-477d-acef-a86b2d0b36a6",
+      "name": "Get Video Webhook",
+      "webhookId": "c21b36aa-5101-4a88-bb40-582b58ce319c"
+    },
+    {
+      "parameters": {
+        "arguments": "=-y -loop 1 -i {input:image} -i {input:audio} -vf \"scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=white\" -c:v libx264 -preset medium -tune stillimage -crf 21 -c:a aac -b:a 192k -shortest -pix_fmt yuv420p {output}",
+        "defaultInputBinaryProperty": "image",
+        "timeoutMs": 45000
+      },
+      "type": "n8n-nodes-ffmpeg-pro-v2.ffmpeg",
+      "typeVersion": 1,
+      "position": [
+        480,
+        240
+      ],
+      "id": "700cb3b4-e4d4-4c6b-8d78-23b289513981",
+      "name": "FFmpeg"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\n\nfor (const item of $input.all()) {\n  let text =\n    item.json?.output ??\n    item.json?.response?.choices?.[0]?.message?.content ??\n    item.json?.choices?.[0]?.message?.content ??\n    item.json?.text ??\n    '';\n\n  text = String(text)\n    // нормализация\n    .normalize('NFKC')\n    // убираем markdown\n    .replace(/```[\\s\\S]*?```/g, ' ')\n    .replace(/`([^`]*)`/g, '$1')\n    .replace(/[*_~#>|]/g, '')\n    // ссылки\n    .replace(/\\[(.*?)\\]\\(.*?\\)/g, '$1')\n    // спецсимволы и кавычки\n    .replace(/[“”„\"']/g, '')\n    // переводы строк → пробел\n    .replace(/[\\r\\n\\t]+/g, ' ')\n    // схлопывание пробелов\n    .replace(/\\s+/g, ' ')\n    .trim();\n\n  out.push({ json: { serializedText: text } });\n}\n\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        240
+      ],
+      "id": "d616553c-b566-4652-9634-dff9962a3346",
+      "name": "Serealizer"
+    },
+    {
+      "parameters": {
+        "model": "=openai/gpt-5.1",
+        "options": {}
+      },
+      "type": "n8n-nodes-routerai.lmChatRouterAi",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        96
+      ],
+      "id": "49cca9ec-1227-4103-a832-57e6cb75af9c",
+      "name": "GPT-5.2",
+      "credentials": {
+        "routerAiApi": {
+          "id": "ZkFguueICnDZ86Pb",
+          "name": "RouterAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://qwen-qwen-tts-demo.hf.space/gradio_api/call/predict/{{ $json.event_id }}",
+        "options": {}
+      },
+      "id": "07a3abc4-b7ca-484f-a3df-de72c81c0f2d",
+      "name": "TTS Poll",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -320,
+        240
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const raw = $json.data || $json || \"\";\n\n// Case 1: If it&apos;s already parsed JSON with data[0].url\nif (Array.isArray($json.data)) {\n  return {\n    json: {\n      audioUrl: $json.data[0]?.url || null,\n      rawJson: $json.data\n    }\n  };\n}\n\n// Case 2: Handle raw SSE text\nconst match = typeof raw === \"string\" ? raw.match(/data:\\s*(\\[[^\\]]+\\])/s) : null;\n\nif (match) {\n  try {\n    const parsed = JSON.parse(match[1]);\n    return {\n      json: {\n        audioUrl: parsed?.[0]?.url || null,\n        rawJson: parsed\n      }\n    };\n  } catch (e) {\n    return {\n      json: {\n        error: \"Failed to parse SSE JSON\",\n        raw\n      }\n    };\n  }\n}\n\n// Case 3: If neither worked\nreturn {\n  json: {\n    error: \"No audio URL found\",\n    raw\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        240
+      ],
+      "id": "97b14e55-4097-420c-86b8-82aff2a88d3b",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "866f799d-e31e-4029-8882-0cb441cabd29",
+              "name": "audio",
+              "value": "={{ $json.audioUrl }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        240
+      ],
+      "id": "ce78039c-e5c9-4f53-85e4-ca588e5d4f4e",
+      "name": "Get Audio URL"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://qwen-qwen-tts-demo.hf.space/gradio_api/call/predict",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"data\": [\n    \"{{ $json.serializedText }}\",\n    \"Dylan\"\n  ]\n} ",
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "id": "7b8834f0-64e1-4e1d-a353-9597f7d1edb0",
+      "name": "Qwen3 TTS",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -480,
+        240
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "url": "={{ $node['Get Audio URL'].json.audio }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 10
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        160,
+        240
+      ],
+      "id": "ad6fc6dd-c4d2-4634-9fc4-9289891ccc5c",
+      "name": "HTTP Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Format Agent": {
+      "main": [
+        [
+          {
+            "node": "Solver Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solver Agent": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Split in Steps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Wait 2s",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Current HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML Agent": {
+      "main": [
+        [
+          {
+            "node": "Html2Png",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Current HTML": {
+      "main": [
+        [
+          {
+            "node": "HTML Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Html2Png": {
+      "main": [
+        [
+          {
+            "node": "Save HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save HTML": {
+      "main": [
+        [
+          {
+            "node": "TTS Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TTS Agent": {
+      "main": [
+        [
+          {
+            "node": "Serealizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split in Steps": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Binaries": {
+      "main": [
+        [
+          {
+            "node": "FFmpeg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Video": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Del All Videos": {
+      "main": [
+        [
+          {
+            "node": "Format Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reset HTML": {
+      "main": [
+        [
+          {
+            "node": "Del All Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Reset HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Flash Lite / 1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "HTML Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Flash Lite / 2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Format Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Flash Lite / 3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "TTS Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Combined Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FFmpeg": {
+      "main": [
+        [
+          {
+            "node": "Add Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serealizer": {
+      "main": [
+        [
+          {
+            "node": "Qwen3 TTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-5.2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Solver Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TTS Poll": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Get Audio URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qwen3 TTS": {
+      "main": [
+        [
+          {
+            "node": "TTS Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Audio URL": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Get Binaries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "61966c1b-64da-4a40-9f4a-54b7462e3c86",
+  "meta": {
+    "instanceId": "768db0b10a6b3c7aa6816d987ba9689b80360382886045ab233c546116e4aa28"
+  },
+  "id": "kCCpcUR8Dxu2VxVJ",
+  "tags": []
+}
